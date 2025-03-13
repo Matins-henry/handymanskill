@@ -619,7 +619,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const distance = `${(Math.random() * 10).toFixed(1)} miles`;
       
       // Format posted time
-      const postedDaysAgo = Math.floor((Date.now() - job.postedAt.getTime()) / (1000 * 60 * 60 * 24));
+      const postedDaysAgo = job.postedAt ? Math.floor((Date.now() - job.postedAt.getTime()) / (1000 * 60 * 60 * 24)) : 0;
       const postedTime = postedDaysAgo === 0 ? 'Today' : 
                          postedDaysAgo === 1 ? 'Yesterday' : 
                          `${postedDaysAgo} days ago`;
