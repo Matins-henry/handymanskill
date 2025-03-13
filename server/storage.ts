@@ -1,115 +1,102 @@
 import { 
-  User, InsertUser, Resume, InsertResume, Job, Portfolio, InsertPortfolio, 
-  JobApplication, InsertJobApplication, SavedJob, InsertSavedJob,
-  OptimizationSuggestion, InsertOptimizationSuggestion, Skill
+  users, type User, type InsertUser, 
+  resumes, type Resume, type InsertResume,
+  jobs, type Job, type InsertJob,
+  portfolioProjects, type PortfolioProject, type InsertPortfolioProject,
+  applications, type Application, type InsertApplication
 } from "@shared/schema";
 
+// Storage interface for CRUD operations
 export interface IStorage {
   // User operations
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  updateUser(id: number, userData: Partial<User>): Promise<User | undefined>;
+  updateUser(id: number, user: Partial<User>): Promise<User | undefined>;
   
   // Resume operations
   getResume(id: number): Promise<Resume | undefined>;
-  getResumeByUserId(userId: number): Promise<Resume | undefined>;
+  getResumesByUserId(userId: number): Promise<Resume[]>;
   createResume(resume: InsertResume): Promise<Resume>;
-  updateResume(id: number, resumeData: Partial<Resume>): Promise<Resume | undefined>;
-  deleteResume(id: number): Promise<boolean>;
-  
-  // Skill operations
-  getAllSkills(): Promise<Skill[]>;
+  updateResume(id: number, resume: Partial<Resume>): Promise<Resume | undefined>;
   
   // Job operations
-  getAllJobs(): Promise<Job[]>;
   getJob(id: number): Promise<Job | undefined>;
-  getJobMatches(userId: number, filters?: {
-    searchTerm?: string;
-    distance?: number;
+  getJobs(filters?: {
     skills?: string[];
-  }): Promise<any[]>; // Using 'any' for the complex match object
-  
-  // Job application operations
-  createJobApplication(application: InsertJobApplication): Promise<JobApplication>;
-  getJobApplicationsByUserId(userId: number): Promise<JobApplication[]>;
-  
-  // Saved job operations
-  saveJob(savedJob: InsertSavedJob): Promise<SavedJob>;
-  unsaveJob(userId: number, jobId: number): Promise<boolean>;
-  getSavedJobsByUserId(userId: number): Promise<SavedJob[]>;
+    location?: string;
+    radius?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<Job[]>;
+  createJob(job: InsertJob): Promise<Job>;
+  updateJob(id: number, job: Partial<Job>): Promise<Job | undefined>;
   
   // Portfolio operations
-  createPortfolioItem(item: InsertPortfolio): Promise<Portfolio>;
-  getPortfolioByUserId(userId: number): Promise<Portfolio[]>;
+  getPortfolioProject(id: number): Promise<PortfolioProject | undefined>;
+  getPortfolioProjectsByUserId(userId: number): Promise<PortfolioProject[]>;
+  createPortfolioProject(project: InsertPortfolioProject): Promise<PortfolioProject>;
+  updatePortfolioProject(id: number, project: Partial<PortfolioProject>): Promise<PortfolioProject | undefined>;
+  deletePortfolioProject(id: number): Promise<boolean>;
   
-  // Optimization suggestions
-  getSuggestionsByUserId(userId: number): Promise<OptimizationSuggestion[]>;
-  createSuggestion(suggestion: InsertOptimizationSuggestion): Promise<OptimizationSuggestion>;
+  // Application operations
+  getApplication(id: number): Promise<Application | undefined>;
+  getApplicationsByUserId(userId: number): Promise<Application[]>;
+  getApplicationsByJobId(jobId: number): Promise<Application[]>;
+  createApplication(application: InsertApplication): Promise<Application>;
+  updateApplication(id: number, application: Partial<Application>): Promise<Application | undefined>;
 }
 
 export class MemStorage implements IStorage {
   private users: Map<number, User>;
   private resumes: Map<number, Resume>;
-  private skills: Map<number, Skill>;
   private jobs: Map<number, Job>;
-  private jobApplications: Map<number, JobApplication>;
-  private savedJobs: Map<number, SavedJob>;
-  private portfolioItems: Map<number, Portfolio>;
-  private suggestions: Map<number, OptimizationSuggestion>;
+  private portfolioProjects: Map<number, PortfolioProject>;
+  private applications: Map<number, Application>;
   
   private userId: number;
   private resumeId: number;
-  private skillId: number;
   private jobId: number;
+  private projectId: number;
   private applicationId: number;
-  private savedJobId: number;
-  private portfolioId: number;
-  private suggestionId: number;
-
+  
   constructor() {
     this.users = new Map();
     this.resumes = new Map();
-    this.skills = new Map();
     this.jobs = new Map();
-    this.jobApplications = new Map();
-    this.savedJobs = new Map();
-    this.portfolioItems = new Map();
-    this.suggestions = new Map();
+    this.portfolioProjects = new Map();
+    this.applications = new Map();
     
     this.userId = 1;
     this.resumeId = 1;
-    this.skillId = 1;
     this.jobId = 1;
+    this.projectId = 1;
     this.applicationId = 1;
-    this.savedJobId = 1;
-    this.portfolioId = 1;
-    this.suggestionId = 1;
     
-    // Initialize with sample data
-    this.initializeSampleData();
+    // Initialize with some sample jobs
+    this.seedJobs();
   }
-
+  
   // User operations
   async getUser(id: number): Promise<User | undefined> {
     return this.users.get(id);
   }
-
+  
   async getUserByUsername(username: string): Promise<User | undefined> {
     return Array.from(this.users.values()).find(
-      (user) => user.username === username
+      (user) => user.username.toLowerCase() === username.toLowerCase()
     );
   }
-
+  
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = this.userId++;
-    const user: User = { ...insertUser, id };
+    const user: User = { ...insertUser, id, skills: [] };
     this.users.set(id, user);
     return user;
   }
   
   async updateUser(id: number, userData: Partial<User>): Promise<User | undefined> {
-    const user = this.users.get(id);
+    const user = await this.getUser(id);
     if (!user) return undefined;
     
     const updatedUser = { ...user, ...userData };
@@ -122,21 +109,28 @@ export class MemStorage implements IStorage {
     return this.resumes.get(id);
   }
   
-  async getResumeByUserId(userId: number): Promise<Resume | undefined> {
-    return Array.from(this.resumes.values()).find(
+  async getResumesByUserId(userId: number): Promise<Resume[]> {
+    return Array.from(this.resumes.values()).filter(
       (resume) => resume.userId === userId
     );
   }
   
-  async createResume(resume: InsertResume): Promise<Resume> {
+  async createResume(insertResume: InsertResume): Promise<Resume> {
     const id = this.resumeId++;
-    const newResume: Resume = { ...resume, id };
-    this.resumes.set(id, newResume);
-    return newResume;
+    const resume: Resume = { 
+      ...insertResume, 
+      id,
+      skillsExtracted: [],
+      experienceYears: 0,
+      matchRate: 0,
+      uploadedAt: new Date()
+    };
+    this.resumes.set(id, resume);
+    return resume;
   }
   
   async updateResume(id: number, resumeData: Partial<Resume>): Promise<Resume | undefined> {
-    const resume = this.resumes.get(id);
+    const resume = await this.getResume(id);
     if (!resume) return undefined;
     
     const updatedResume = { ...resume, ...resumeData };
@@ -144,332 +138,250 @@ export class MemStorage implements IStorage {
     return updatedResume;
   }
   
-  async deleteResume(id: number): Promise<boolean> {
-    return this.resumes.delete(id);
-  }
-  
-  // Skill operations
-  async getAllSkills(): Promise<Skill[]> {
-    return Array.from(this.skills.values());
-  }
-  
   // Job operations
-  async getAllJobs(): Promise<Job[]> {
-    return Array.from(this.jobs.values());
-  }
-  
   async getJob(id: number): Promise<Job | undefined> {
     return this.jobs.get(id);
   }
   
-  async getJobMatches(userId: number, filters?: {
-    searchTerm?: string;
-    distance?: number;
+  async getJobs(filters?: {
     skills?: string[];
-  }): Promise<any[]> {
-    const user = this.users.get(userId);
-    const resume = await this.getResumeByUserId(userId);
-    
-    if (!user || !resume) return [];
-    
+    location?: string;
+    radius?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<Job[]> {
     let jobs = Array.from(this.jobs.values());
     
-    // Apply filters if specified
+    // Apply filters if provided
     if (filters) {
-      if (filters.searchTerm) {
-        const term = filters.searchTerm.toLowerCase();
+      if (filters.skills && filters.skills.length > 0) {
         jobs = jobs.filter(job => 
-          job.title.toLowerCase().includes(term) || 
-          job.company.toLowerCase().includes(term) ||
-          job.description.toLowerCase().includes(term)
+          filters.skills!.some(skill => 
+            job.skills.map(s => s.toLowerCase()).includes(skill.toLowerCase())
+          )
         );
       }
       
-      if (filters.distance) {
-        // Simple distance filter based on static distances
-        // In a real app, this would use actual geolocation calculations
-        jobs = jobs.filter(job => {
-          const distance = parseFloat(job.location.split('(')[1]?.split(' miles')[0] || '100');
-          return distance <= filters.distance!;
-        });
+      if (filters.location) {
+        jobs = jobs.filter(job => 
+          job.location.toLowerCase().includes(filters.location!.toLowerCase())
+        );
       }
       
-      if (filters.skills && filters.skills.length > 0) {
-        jobs = jobs.filter(job => {
-          // Check if any of the job's required skills match the filter skills
-          return job.requiredSkills.some((skill: string) => 
-            filters.skills!.includes(skill)
-          );
-        });
+      // Simple pagination
+      if (filters.limit && filters.offset !== undefined) {
+        jobs = jobs.slice(filters.offset, filters.offset + filters.limit);
+      } else if (filters.limit) {
+        jobs = jobs.slice(0, filters.limit);
       }
     }
     
-    // Calculate match percentage based on extracted skills
-    const userSkills = resume.extractedSkills || [];
-    
-    const jobMatches = jobs.map(job => {
-      // Calculate match percentage
-      const requiredSkills = job.requiredSkills;
-      const matchingSkills = requiredSkills.filter(skill => 
-        userSkills.includes(skill)
-      );
-      
-      const matchPercentage = Math.round(
-        (matchingSkills.length / requiredSkills.length) * 100
-      );
-      
-      // Get saved status
-      const isSaved = Array.from(this.savedJobs.values()).some(
-        saved => saved.userId === userId && saved.jobId === job.id
-      );
-      
-      // Format skills with match strength
-      const formattedSkills = requiredSkills.map(skill => ({
-        name: skill,
-        match: userSkills.includes(skill) ? 'strong' : 
-               userSkills.some(s => s.toLowerCase().includes(skill.toLowerCase()) || 
-                                   skill.toLowerCase().includes(s.toLowerCase())) 
-               ? 'medium' : 'weak'
-      }));
-      
-      // Get distance from location string
-      const distance = job.location.split('(')[1]?.split(' miles')[0] || '0';
-      
-      return {
-        ...job,
-        matchPercentage,
-        saved: isSaved,
-        skills: formattedSkills,
-        distance
-      };
-    });
-    
-    // Sort by match percentage (descending)
-    return jobMatches.sort((a, b) => b.matchPercentage - a.matchPercentage);
+    return jobs;
   }
   
-  // Job application operations
-  async createJobApplication(application: InsertJobApplication): Promise<JobApplication> {
-    const id = this.applicationId++;
-    const newApplication: JobApplication = { ...application, id };
-    this.jobApplications.set(id, newApplication);
-    return newApplication;
-  }
-  
-  async getJobApplicationsByUserId(userId: number): Promise<JobApplication[]> {
-    return Array.from(this.jobApplications.values()).filter(
-      app => app.userId === userId
-    );
-  }
-  
-  // Saved job operations
-  async saveJob(savedJob: InsertSavedJob): Promise<SavedJob> {
-    // Check if already saved
-    const existing = Array.from(this.savedJobs.values()).find(
-      job => job.userId === savedJob.userId && job.jobId === savedJob.jobId
-    );
-    
-    if (existing) return existing;
-    
-    const id = this.savedJobId++;
-    const newSavedJob: SavedJob = { 
-      ...savedJob, 
-      id, 
-      savedDate: new Date() 
+  async createJob(insertJob: InsertJob): Promise<Job> {
+    const id = this.jobId++;
+    const job: Job = { 
+      ...insertJob, 
+      id,
+      postedAt: new Date(),
+      isActive: true
     };
-    this.savedJobs.set(id, newSavedJob);
-    return newSavedJob;
+    this.jobs.set(id, job);
+    return job;
   }
   
-  async unsaveJob(userId: number, jobId: number): Promise<boolean> {
-    const savedJob = Array.from(this.savedJobs.values()).find(
-      job => job.userId === userId && job.jobId === jobId
-    );
+  async updateJob(id: number, jobData: Partial<Job>): Promise<Job | undefined> {
+    const job = await this.getJob(id);
+    if (!job) return undefined;
     
-    if (!savedJob) return false;
-    return this.savedJobs.delete(savedJob.id);
-  }
-  
-  async getSavedJobsByUserId(userId: number): Promise<SavedJob[]> {
-    return Array.from(this.savedJobs.values()).filter(
-      job => job.userId === userId
-    );
+    const updatedJob = { ...job, ...jobData };
+    this.jobs.set(id, updatedJob);
+    return updatedJob;
   }
   
   // Portfolio operations
-  async createPortfolioItem(item: InsertPortfolio): Promise<Portfolio> {
-    const id = this.portfolioId++;
-    const newItem: Portfolio = { ...item, id, createdAt: new Date() };
-    this.portfolioItems.set(id, newItem);
-    return newItem;
+  async getPortfolioProject(id: number): Promise<PortfolioProject | undefined> {
+    return this.portfolioProjects.get(id);
   }
   
-  async getPortfolioByUserId(userId: number): Promise<Portfolio[]> {
-    return Array.from(this.portfolioItems.values())
-      .filter(item => item.userId === userId)
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-  }
-  
-  // Optimization suggestions
-  async getSuggestionsByUserId(userId: number): Promise<OptimizationSuggestion[]> {
-    return Array.from(this.suggestions.values()).filter(
-      suggestion => suggestion.userId === userId
+  async getPortfolioProjectsByUserId(userId: number): Promise<PortfolioProject[]> {
+    return Array.from(this.portfolioProjects.values()).filter(
+      (project) => project.userId === userId
     );
   }
   
-  async createSuggestion(suggestion: InsertOptimizationSuggestion): Promise<OptimizationSuggestion> {
-    const id = this.suggestionId++;
-    const newSuggestion: OptimizationSuggestion = { ...suggestion, id };
-    this.suggestions.set(id, newSuggestion);
-    return newSuggestion;
+  async createPortfolioProject(insertProject: InsertPortfolioProject): Promise<PortfolioProject> {
+    const id = this.projectId++;
+    const project: PortfolioProject = { 
+      ...insertProject, 
+      id,
+      createdAt: new Date()
+    };
+    this.portfolioProjects.set(id, project);
+    return project;
   }
   
-  // Initialize sample data for demo
-  private initializeSampleData() {
-    // Sample skills
-    const skillsList = [
-      "Plumbing", "Electrical", "Carpentry", "Painting", "Drywall", 
-      "Tiling", "Flooring", "Roofing", "HVAC", "Appliance Repair",
-      "Welding", "Masonry", "Landscaping", "Concrete Work", "Cabinetry"
+  async updatePortfolioProject(id: number, projectData: Partial<PortfolioProject>): Promise<PortfolioProject | undefined> {
+    const project = await this.getPortfolioProject(id);
+    if (!project) return undefined;
+    
+    const updatedProject = { ...project, ...projectData };
+    this.portfolioProjects.set(id, updatedProject);
+    return updatedProject;
+  }
+  
+  async deletePortfolioProject(id: number): Promise<boolean> {
+    return this.portfolioProjects.delete(id);
+  }
+  
+  // Application operations
+  async getApplication(id: number): Promise<Application | undefined> {
+    return this.applications.get(id);
+  }
+  
+  async getApplicationsByUserId(userId: number): Promise<Application[]> {
+    return Array.from(this.applications.values()).filter(
+      (application) => application.userId === userId
+    );
+  }
+  
+  async getApplicationsByJobId(jobId: number): Promise<Application[]> {
+    return Array.from(this.applications.values()).filter(
+      (application) => application.jobId === jobId
+    );
+  }
+  
+  async createApplication(insertApplication: InsertApplication): Promise<Application> {
+    const id = this.applicationId++;
+    const application: Application = { 
+      ...insertApplication, 
+      id,
+      status: "pending",
+      appliedAt: new Date()
+    };
+    this.applications.set(id, application);
+    return application;
+  }
+  
+  async updateApplication(id: number, applicationData: Partial<Application>): Promise<Application | undefined> {
+    const application = await this.getApplication(id);
+    if (!application) return undefined;
+    
+    const updatedApplication = { ...application, ...applicationData };
+    this.applications.set(id, updatedApplication);
+    return updatedApplication;
+  }
+  
+  // Seed some initial jobs for testing
+  private seedJobs() {
+    const jobs: Omit<Job, "id">[] = [
+      {
+        title: "Residential Carpenter",
+        company: "Johnson Construction LLC",
+        location: "San Diego, CA",
+        description: "Looking for experienced carpenter for residential projects including framing, finishing, and installation work. Must have own tools and reliable transportation.",
+        skills: ["Carpentry", "Framing", "Woodworking", "Finishing"],
+        categories: ["Residential"],
+        employmentType: "Full-time",
+        salary: "$30 - $35 /hour",
+        contactEmail: "jobs@johnsonconstruction.example",
+        contactPhone: "555-123-4567",
+        postedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
+        responsibilities: [
+          "Frame and finish residential structures",
+          "Install doors, windows, and trim",
+          "Read and interpret blueprints",
+          "Ensure work meets building codes and standards"
+        ],
+        requirements: [
+          "3+ years of carpentry experience",
+          "Own basic tools",
+          "Valid driver's license",
+          "Ability to lift 50+ pounds"
+        ],
+        benefits: [
+          "Health insurance",
+          "Paid time off",
+          "401(k) matching",
+          "Tool allowance"
+        ],
+        coordinates: { lat: 32.7157, lng: -117.1611 },
+        isActive: true
+      },
+      {
+        title: "Remodeling Specialist",
+        company: "Elite Home Services",
+        location: "La Jolla, CA",
+        description: "Seeking experienced remodeling professional for high-end residential projects. Experience with kitchen and bathroom renovations required.",
+        skills: ["Drywall", "Painting", "Flooring", "Tiling", "Renovation"],
+        categories: ["Residential", "Luxury"],
+        employmentType: "Contract",
+        salary: "$40 - $45 /hour",
+        contactEmail: "careers@elitehome.example",
+        contactPhone: "555-987-6543",
+        postedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 1 week ago
+        responsibilities: [
+          "Complete full bathroom and kitchen remodels",
+          "Install custom cabinetry and fixtures",
+          "Coordinate with other trades",
+          "Provide estimates and timelines for clients"
+        ],
+        requirements: [
+          "5+ years of remodeling experience",
+          "Portfolio of completed projects",
+          "Experience with high-end finishes",
+          "Excellent communication skills"
+        ],
+        benefits: [
+          "Flexible schedule",
+          "Performance bonuses",
+          "Long-term projects"
+        ],
+        coordinates: { lat: 32.8328, lng: -117.2713 },
+        isActive: true
+      },
+      {
+        title: "Plumbing Technician",
+        company: "Fast Flow Plumbing",
+        location: "San Diego, CA",
+        description: "Fast Flow Plumbing needs experienced plumbing technicians for new construction and service work. Competitive pay and benefits.",
+        skills: ["Plumbing", "Pipe Fitting", "Troubleshooting", "Repairs"],
+        categories: ["Commercial", "Residential"],
+        employmentType: "Full-time",
+        salary: "$28 - $32 /hour",
+        contactEmail: "hr@fastflow.example",
+        contactPhone: "555-789-0123",
+        postedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
+        responsibilities: [
+          "Install piping systems in new construction",
+          "Diagnose and repair plumbing issues",
+          "Respond to emergency service calls",
+          "Maintain accurate service records"
+        ],
+        requirements: [
+          "2+ years of plumbing experience",
+          "Knowledge of local plumbing codes",
+          "Valid driver's license",
+          "Available for on-call rotation"
+        ],
+        benefits: [
+          "Company vehicle",
+          "Health and dental insurance",
+          "Paid training and certification",
+          "Overtime opportunities"
+        ],
+        coordinates: { lat: 32.7157, lng: -117.1611 },
+        isActive: true
+      }
     ];
     
-    skillsList.forEach(name => {
-      const id = this.skillId++;
-      this.skills.set(id, { id, name, category: "Handyman" });
-    });
-    
-    // Sample user
-    const userId = this.userId++;
-    this.users.set(userId, {
-      id: userId,
-      username: "mjohnson",
-      password: "password123", // In a real app, this would be hashed
-      name: "Michael Johnson",
-      title: "Experienced Handyman",
-      about: "Skilled handyman with over 10 years of experience in residential and commercial repairs and renovations. Proficient in plumbing, electrical work, carpentry, and general maintenance.",
-      location: "San Francisco, CA",
-      profileImage: undefined,
-      createdAt: new Date()
-    });
-    
-    // Sample resume
-    const resumeId = this.resumeId++;
-    this.resumes.set(resumeId, {
-      id: resumeId,
-      userId,
-      filename: "michael_johnson_resume.pdf",
-      fileSize: "2.4 MB",
-      fileType: "application/pdf",
-      content: "Sample resume content...",
-      uploadDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
-      extractedSkills: ["Plumbing", "Electrical", "Carpentry", "Painting", "Drywall Repair"]
-    });
-    
-    // Sample jobs
-    const createJob = (
-      title: string, 
-      company: string, 
-      location: string, 
-      type: string, 
-      salary: string, 
-      skills: string[]
-    ) => {
+    jobs.forEach((job) => {
       const id = this.jobId++;
-      this.jobs.set(id, {
-        id,
-        title,
-        company,
-        location,
-        description: `We are looking for an experienced ${title} to join our team...`,
-        type,
-        salary,
-        latitude: "37.7749",  // San Francisco coordinates
-        longitude: "-122.4194",
-        requiredSkills: skills,
-        postedDate: new Date(Date.now() - Math.floor(Math.random() * 10) * 24 * 60 * 60 * 1000)
-      });
-    };
-    
-    createJob(
-      "Residential Plumbing Specialist", 
-      "HomeFixers Inc.", 
-      "San Francisco, CA (3.2 miles)", 
-      "Full-time", 
-      "$35-45/hr", 
-      ["Plumbing", "Pipe Fitting", "Fixture Installation"]
-    );
-    
-    createJob(
-      "General Maintenance Technician", 
-      "City Property Management", 
-      "San Francisco, CA (1.8 miles)", 
-      "Full-time", 
-      "$30-40/hr", 
-      ["Plumbing", "Electrical", "Carpentry", "Painting", "Drywall"]
-    );
-    
-    createJob(
-      "Home Renovation Specialist", 
-      "RenovateRight Contractors", 
-      "Oakland, CA (5.6 miles)", 
-      "Contract", 
-      "$40-50/hr", 
-      ["Carpentry", "Drywall", "Tile Work", "Painting", "Flooring"]
-    );
-    
-    createJob(
-      "Commercial Electrician", 
-      "PowerPro Services", 
-      "San Jose, CA (45.2 miles)", 
-      "Full-time", 
-      "$50-60/hr", 
-      ["Electrical", "Wiring", "Circuit Installation", "Troubleshooting"]
-    );
-    
-    createJob(
-      "Handyman - Multiple Properties", 
-      "Bay Area Property Management", 
-      "San Francisco, CA (2.5 miles)", 
-      "Part-time", 
-      "$25-35/hr", 
-      ["Plumbing", "Electrical", "Drywall", "Painting", "Basic Repairs"]
-    );
-    
-    // Sample suggestions
-    const createSuggestion = (
-      title: string,
-      description: string,
-      type: "warning" | "success"
-    ) => {
-      const id = this.suggestionId++;
-      this.suggestions.set(id, {
-        id,
-        userId,
-        title,
-        description,
-        type,
-        implemented: false
-      });
-    };
-    
-    createSuggestion(
-      "Add specific certifications",
-      "Mentioning industry certifications can increase your match rate by 45%",
-      "warning"
-    );
-    
-    createSuggestion(
-      "Include project examples",
-      "Describing 2-3 detailed project examples can improve your match quality",
-      "warning"
-    );
-    
-    createSuggestion(
-      "Good skill coverage",
-      "Your resume includes all key skills for your target positions",
-      "success"
-    );
+      this.jobs.set(id, { ...job, id });
+    });
   }
 }
 
+// Export a singleton instance of the storage
 export const storage = new MemStorage();

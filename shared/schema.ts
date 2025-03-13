@@ -1,45 +1,46 @@
-import { pgTable, text, serial, integer, timestamp, boolean, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, jsonb, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// User table
+// Users table
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
-  name: text("name"),
-  title: text("title"),
-  about: text("about"),
+  email: text("email"),
+  bio: text("bio"),
   location: text("location"),
-  profileImage: text("profile_image"),
-  createdAt: timestamp("created_at").defaultNow()
+  phone: text("phone"),
+  avatar: text("avatar"),
+  yearsOfExperience: integer("yearsofexperience"),
+  skills: text("skills").array(),
+  memberSince: timestamp("membersince").defaultNow()
 });
 
-// Resume table
+export const insertUserSchema = createInsertSchema(users).pick({
+  username: true,
+  password: true,
+  email: true,
+});
+
+// Resumes table
 export const resumes = pgTable("resumes", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => users.id),
+  userId: integer("userid").notNull().references(() => users.id),
   filename: text("filename").notNull(),
-  fileSize: text("file_size").notNull(),
-  fileType: text("file_type").notNull(),
-  content: text("content"),
-  uploadDate: timestamp("upload_date").defaultNow(),
-  extractedSkills: text("extracted_skills").array()
+  fileType: text("filetype").notNull(),
+  filePath: text("filepath").notNull(),
+  uploadedAt: timestamp("uploadedat").defaultNow(),
+  skillsExtracted: text("skillsextracted").array(),
+  experienceYears: integer("experienceyears"),
+  matchRate: integer("matchrate"),
 });
 
-// Skills table
-export const skills = pgTable("skills", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull().unique(),
-  category: text("category")
-});
-
-// UserSkills table (many-to-many)
-export const userSkills = pgTable("user_skills", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => users.id),
-  skillId: integer("skill_id").notNull().references(() => skills.id),
-  level: text("level")
+export const insertResumeSchema = createInsertSchema(resumes).pick({
+  userId: true,
+  filename: true,
+  fileType: true,
+  filePath: true,
 });
 
 // Jobs table
@@ -49,88 +50,88 @@ export const jobs = pgTable("jobs", {
   company: text("company").notNull(),
   location: text("location").notNull(),
   description: text("description").notNull(),
-  type: text("type").notNull(),
-  salary: text("salary"),
-  latitude: text("latitude"),
-  longitude: text("longitude"),
-  requiredSkills: text("required_skills").array(),
-  postedDate: timestamp("posted_date").defaultNow()
+  skills: text("skills").array().notNull(),
+  categories: text("categories").array(),
+  employmentType: text("employmenttype").notNull(),
+  salary: text("salary").notNull(),
+  contactEmail: text("contactemail"),
+  contactPhone: text("contactphone"),
+  postedAt: timestamp("postedat").defaultNow(),
+  responsibilities: text("responsibilities").array(),
+  requirements: text("requirements").array(),
+  benefits: text("benefits").array(),
+  coordinates: jsonb("coordinates"),
+  isActive: boolean("isactive").default(true),
 });
 
-// JobApplications table
-export const jobApplications = pgTable("job_applications", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => users.id),
-  jobId: integer("job_id").notNull().references(() => jobs.id),
-  status: text("status").notNull(),
-  applicationDate: timestamp("application_date").defaultNow(),
-  coverLetter: text("cover_letter")
+export const insertJobSchema = createInsertSchema(jobs).pick({
+  title: true,
+  company: true, 
+  location: true,
+  description: true,
+  skills: true,
+  categories: true,
+  employmentType: true,
+  salary: true,
+  contactEmail: true,
+  contactPhone: true,
+  responsibilities: true,
+  requirements: true,
+  benefits: true,
+  coordinates: true,
 });
 
-// SavedJobs table
-export const savedJobs = pgTable("saved_jobs", {
+// Portfolio projects table
+export const portfolioProjects = pgTable("portfolioprojects", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => users.id),
-  jobId: integer("job_id").notNull().references(() => jobs.id),
-  savedDate: timestamp("saved_date").defaultNow()
-});
-
-// Portfolio table
-export const portfolio = pgTable("portfolio", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => users.id),
+  userId: integer("userid").notNull().references(() => users.id),
   title: text("title").notNull(),
+  projectType: text("projecttype").notNull(),
   description: text("description").notNull(),
-  duration: text("duration"),
-  skills: text("skills"),
-  createdAt: timestamp("created_at").defaultNow()
+  skills: text("skills").array(),
+  images: text("images").array(),
+  createdAt: timestamp("createdat").defaultNow(),
 });
 
-// OptimizationSuggestions table
-export const optimizationSuggestions = pgTable("optimization_suggestions", {
+export const insertPortfolioProjectSchema = createInsertSchema(portfolioProjects).pick({
+  userId: true,
+  title: true,
+  projectType: true,
+  description: true,
+  skills: true,
+  images: true,
+});
+
+// Applications table (for job applications)
+export const applications = pgTable("applications", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => users.id),
-  title: text("title").notNull(),
-  description: text("description").notNull(),
-  type: text("type").notNull(),
-  implemented: boolean("implemented").default(false)
+  userId: integer("userid").notNull().references(() => users.id),
+  jobId: integer("jobid").notNull().references(() => jobs.id),
+  status: text("status").notNull().default("pending"),
+  coverLetter: text("coverletter"),
+  resumeId: integer("resumeid").references(() => resumes.id),
+  appliedAt: timestamp("appliedat").defaultNow(),
 });
 
-// Schema validations for inserts
-export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
-export const insertResumeSchema = createInsertSchema(resumes).omit({ id: true, uploadDate: true });
-export const insertSkillSchema = createInsertSchema(skills).omit({ id: true });
-export const insertUserSkillSchema = createInsertSchema(userSkills).omit({ id: true });
-export const insertJobSchema = createInsertSchema(jobs).omit({ id: true, postedDate: true });
-export const insertJobApplicationSchema = createInsertSchema(jobApplications).omit({ id: true, applicationDate: true });
-export const insertSavedJobSchema = createInsertSchema(savedJobs).omit({ id: true, savedDate: true });
-export const insertPortfolioSchema = createInsertSchema(portfolio).omit({ id: true, createdAt: true });
-export const insertOptimizationSuggestionSchema = createInsertSchema(optimizationSuggestions).omit({ id: true });
+export const insertApplicationSchema = createInsertSchema(applications).pick({
+  userId: true,
+  jobId: true,
+  coverLetter: true,
+  resumeId: true,
+});
 
-// Types
-export type InsertUser = z.infer<typeof insertUserSchema>;
+// Type exports
 export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
 
-export type InsertResume = z.infer<typeof insertResumeSchema>;
 export type Resume = typeof resumes.$inferSelect;
+export type InsertResume = z.infer<typeof insertResumeSchema>;
 
-export type InsertSkill = z.infer<typeof insertSkillSchema>;
-export type Skill = typeof skills.$inferSelect;
-
-export type InsertUserSkill = z.infer<typeof insertUserSkillSchema>;
-export type UserSkill = typeof userSkills.$inferSelect;
-
-export type InsertJob = z.infer<typeof insertJobSchema>;
 export type Job = typeof jobs.$inferSelect;
+export type InsertJob = z.infer<typeof insertJobSchema>;
 
-export type InsertJobApplication = z.infer<typeof insertJobApplicationSchema>;
-export type JobApplication = typeof jobApplications.$inferSelect;
+export type PortfolioProject = typeof portfolioProjects.$inferSelect;
+export type InsertPortfolioProject = z.infer<typeof insertPortfolioProjectSchema>;
 
-export type InsertSavedJob = z.infer<typeof insertSavedJobSchema>;
-export type SavedJob = typeof savedJobs.$inferSelect;
-
-export type InsertPortfolio = z.infer<typeof insertPortfolioSchema>;
-export type Portfolio = typeof portfolio.$inferSelect;
-
-export type InsertOptimizationSuggestion = z.infer<typeof insertOptimizationSuggestionSchema>;
-export type OptimizationSuggestion = typeof optimizationSuggestions.$inferSelect;
+export type Application = typeof applications.$inferSelect;
+export type InsertApplication = z.infer<typeof insertApplicationSchema>;

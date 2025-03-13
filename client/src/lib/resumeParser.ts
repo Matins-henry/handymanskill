@@ -1,68 +1,65 @@
-// This file is for frontend handling of resume parsing functionality
+// Abstraction over pdf and docx parsing functionality
+// The actual parsing happens on the server, this module provides client-side helpers
 
 import { apiRequest } from "./queryClient";
 
-export const uploadAndParseResume = async (file: File) => {
-  // Create a FormData instance to send the file
+type ResumeParseResponse = {
+  skills: string[];
+  experience: {
+    years: number;
+    positions: string[];
+  };
+  education: string[];
+  success: boolean;
+  message?: string;
+};
+
+export type FileUploadResponse = {
+  fileId: string;
+  fileName: string;
+  fileType: string;
+  success: boolean;
+};
+
+export const ALLOWED_FILE_TYPES = [
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+];
+
+export const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
+export async function uploadResume(file: File): Promise<FileUploadResponse> {
+  if (!ALLOWED_FILE_TYPES.includes(file.type)) {
+    throw new Error("Unsupported file format. Please upload a PDF or DOCX file.");
+  }
+
+  if (file.size > MAX_FILE_SIZE) {
+    throw new Error("File size exceeds 10MB limit.");
+  }
+
   const formData = new FormData();
-  formData.append('resume', file);
-
-  // Since apiRequest doesn't support FormData, we'll use fetch directly
-  const response = await fetch('/api/user/resume/upload', {
-    method: 'POST',
+  formData.append("resume", file);
+  
+  const response = await fetch("/api/resume/upload", {
+    method: "POST",
     body: formData,
-    credentials: 'include',
+    credentials: "include",
   });
-
+  
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(error || response.statusText);
+    const errorText = await response.text();
+    throw new Error(`Upload failed: ${errorText}`);
   }
-
+  
   return await response.json();
-};
+}
 
-export const getParsedSkills = async () => {
-  return await apiRequest('GET', '/api/user/resume/skills');
-};
+export async function parseResume(fileId: string): Promise<ResumeParseResponse> {
+  const response = await apiRequest("GET", `/api/resume/parse/${fileId}`, undefined);
+  return await response.json();
+}
 
-export const getExtractedInfo = async () => {
-  return await apiRequest('GET', '/api/user/resume/extract');
-};
-
-export const getResumeOptimizationTips = async () => {
-  return await apiRequest('GET', '/api/user/resume/optimize');
-};
-
-export const downloadResume = async () => {
-  const response = await fetch('/api/user/resume/download', {
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to download resume');
-  }
-  
-  // Create a blob and download it
-  const blob = await response.blob();
-  const url = window.URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.style.display = 'none';
-  a.href = url;
-  
-  // Get filename from Content-Disposition header if available
-  const contentDisposition = response.headers.get('Content-Disposition');
-  let filename = 'resume.pdf';
-  if (contentDisposition) {
-    const filenameMatch = contentDisposition.match(/filename="(.+)"/);
-    if (filenameMatch) {
-      filename = filenameMatch[1];
-    }
-  }
-  
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  window.URL.revokeObjectURL(url);
-  document.body.removeChild(a);
-};
+export async function getResumeSkillMatches(fileId: string) {
+  const response = await apiRequest("GET", `/api/resume/skills/${fileId}`, undefined);
+  return await response.json();
+}
