@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "buildCommand": "cd SkillMatchPro && npm install && npm run build",
-  "outputDirectory": "SkillMatchPro/client/dist",
+  "buildCommand": "npm install && npm run build",
+  "outputDirectory": "client/dist",
   "rewrites": [
     {
       "source": "/api/(.*)",

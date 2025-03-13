@@ -1,6 +1,10 @@
+.DS_Store
 node_modules
 dist
-.DS_Store
-server/public
-vite.config.ts.*
-*.tar.gz
+dist-ssr
+*.local
+.env
+.env.*
+!.env.example
+uploads/*
+!uploads/.gitkeep
