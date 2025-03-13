@@ -30,7 +30,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
-import { User as UserType } from "@/shared/schema";
+// Define a basic user type locally to avoid import issues
+interface UserType {
+  id: number;
+  username: string;
+  email?: string;
+  avatar?: string;
+  skills?: string[];
+}
 
 const Navbar = () => {
   const [location, setLocation] = useLocation();
