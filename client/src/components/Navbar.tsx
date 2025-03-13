@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -6,6 +6,7 @@ import {
   DropdownMenu, 
   DropdownMenuContent, 
   DropdownMenuItem, 
+  DropdownMenuSeparator,
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { 
@@ -13,100 +14,185 @@ import {
   SheetContent, 
   SheetTrigger 
 } from "@/components/ui/sheet";
-import { Wrench, Bell, Menu, User, LogOut, Settings } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { Badge } from "@/components/ui/badge";
+import { 
+  Wrench, 
+  Bell, 
+  Menu, 
+  User, 
+  LogOut, 
+  Briefcase, 
+  Settings, 
+  FileText,
+  HardHat
+} from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { motion } from "framer-motion";
+import { User as UserType } from "@/shared/schema";
 
 const Navbar = () => {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const { data: user } = useQuery({
+  // Monitor scroll position to add shadow when scrolled
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 20);
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // Fetch the user profile
+  const { data: user, isLoading: isUserLoading } = useQuery<UserType>({
     queryKey: ['/api/user/profile'],
     retry: false,
     refetchOnWindowFocus: false,
   });
+
+  // Logout mutation
+  const logoutMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/auth/logout"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/user/profile'] });
+      toast({
+        title: "Logged out successfully",
+        description: "You have been logged out of your account",
+      });
+      setLocation("/");
+    },
+    onError: () => {
+      toast({
+        title: "Logout failed",
+        description: "There was a problem logging out. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const handleLogout = () => {
+    logoutMutation.mutate();
+  };
 
   const isActive = (path: string) => {
     return location === path;
   };
 
   return (
-    <nav className="bg-white shadow-sm sticky top-0 z-50">
+    <motion.nav 
+      initial={{ y: -100, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ duration: 0.5, ease: "easeOut" }}
+      className={`bg-white sticky top-0 z-50 transition-all duration-300 ${
+        scrolled ? "shadow-md" : "shadow-sm"
+      }`}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
             <Link href="/" className="flex-shrink-0 flex items-center">
-              <Wrench className="h-6 w-6 text-primary mr-2" />
-              <span className="text-xl font-bold text-gray-800">SkillMatch</span>
+              <HardHat className="h-7 w-7 text-primary mr-2" />
+              <span className="text-xl font-bold bg-gradient-to-r from-primary to-amber-500 bg-clip-text text-transparent">
+                HandyMatch
+              </span>
             </Link>
             
-            <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-              <Link href="/" className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
+            <div className="hidden md:ml-8 md:flex md:space-x-8">
+              <Link href="/" className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors duration-200 ${
                 isActive('/') ? 'border-primary text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
               }`}>
                 Home
               </Link>
-              <Link href="/#job-search" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                Jobs
-              </Link>
-              <Link href="/#portfolio" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                Portfolio
-              </Link>
-              <Link href="/profile" className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
-                isActive('/profile') ? 'border-primary text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+              <Link href="/job-matches" className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors duration-200 ${
+                isActive('/job-matches') ? 'border-primary text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
               }`}>
-                Profile
+                Job Matches
+              </Link>
+              <Link href="/portfolio" className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors duration-200 ${
+                isActive('/portfolio') ? 'border-primary text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+              }`}>
+                Portfolio
               </Link>
             </div>
           </div>
           
-          <div className="hidden sm:ml-6 sm:flex sm:items-center">
-            <Button variant="ghost" size="icon" className="mr-2">
-              <Bell className="h-5 w-5 text-gray-400" />
-              <span className="sr-only">Notifications</span>
-            </Button>
-
+          <div className="hidden md:ml-6 md:flex md:items-center space-x-3">
             {user ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative rounded-full h-8 w-8 p-0">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={user.avatar || ''} alt={user.username} />
-                      <AvatarFallback>{user.username?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
-                    </Avatar>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem asChild>
-                    <Link href="/profile">
-                      <User className="mr-2 h-4 w-4" />
-                      <span>Profile</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/settings">
-                      <Settings className="mr-2 h-4 w-4" />
-                      <span>Settings</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={async () => {
-                    await apiRequest('POST', '/api/auth/logout', {});
-                    window.location.href = '/';
-                  }}>
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Logout</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <>
+                <Button variant="outline" size="sm" className="flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  <span>Upload Resume</span>
+                </Button>
+                
+                <Button variant="ghost" size="icon" className="relative">
+                  <Bell className="h-5 w-5 text-gray-500" />
+                  <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0">2</Badge>
+                  <span className="sr-only">Notifications</span>
+                </Button>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="relative rounded-full h-10 w-10 p-0 border-2 border-primary/10 bg-primary/5 overflow-hidden">
+                      <Avatar className="h-9 w-9">
+                        <AvatarImage src={user.avatar || ''} alt={user.username} />
+                        <AvatarFallback className="bg-primary/10 text-primary font-medium">
+                          {user.username?.[0]?.toUpperCase() || 'U'}
+                        </AvatarFallback>
+                      </Avatar>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <div className="px-2 py-1.5">
+                      <p className="text-sm font-medium">{user.username}</p>
+                      <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                    </div>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <Link href="/profile" className="cursor-pointer">
+                        <User className="mr-2 h-4 w-4" />
+                        <span>My Profile</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/job-matches" className="cursor-pointer">
+                        <Briefcase className="mr-2 h-4 w-4" />
+                        <span>Job Matches</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/portfolio" className="cursor-pointer">
+                        <FileText className="mr-2 h-4 w-4" />
+                        <span>My Portfolio</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600 focus:text-red-600">
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>Log out</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
             ) : (
-              <Link href="/profile">
-                <Button>Sign In</Button>
-              </Link>
+              <>
+                <Link href="/login">
+                  <Button variant="outline" size="sm">Log in</Button>
+                </Link>
+                <Link href="/register">
+                  <Button size="sm">Sign up</Button>
+                </Link>
+              </>
             )}
           </div>
           
-          <div className="flex items-center sm:hidden">
+          {/* Mobile menu button */}
+          <div className="flex items-center md:hidden">
             <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon">
@@ -114,54 +200,76 @@ const Navbar = () => {
                   <span className="sr-only">Open main menu</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left">
+              <SheetContent side="left" className="w-72">
+                <div className="flex items-center mb-6">
+                  <HardHat className="h-6 w-6 text-primary mr-2" />
+                  <span className="text-xl font-bold bg-gradient-to-r from-primary to-amber-500 bg-clip-text text-transparent">
+                    HandyMatch
+                  </span>
+                </div>
+                
                 <div className="flex flex-col space-y-3 mt-6">
                   <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${
                     isActive('/') ? 'bg-primary text-white' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                   }`}>
                     Home
                   </Link>
-                  <Link href="/#job-search" onClick={() => setIsMobileMenuOpen(false)} className="text-gray-600 hover:bg-gray-50 hover:text-gray-900 flex items-center px-3 py-2 text-base font-medium rounded-md">
-                    Jobs
-                  </Link>
-                  <Link href="/#portfolio" onClick={() => setIsMobileMenuOpen(false)} className="text-gray-600 hover:bg-gray-50 hover:text-gray-900 flex items-center px-3 py-2 text-base font-medium rounded-md">
-                    Portfolio
-                  </Link>
-                  <Link href="/profile" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${
-                    isActive('/profile') ? 'bg-primary text-white' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  <Link href="/job-matches" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${
+                    isActive('/job-matches') ? 'bg-primary text-white' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                   }`}>
-                    Profile
+                    Job Matches
+                  </Link>
+                  <Link href="/portfolio" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${
+                    isActive('/portfolio') ? 'bg-primary text-white' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  }`}>
+                    Portfolio
                   </Link>
                 </div>
                 
-                {user && (
+                {user ? (
                   <div className="pt-4 pb-3 border-t border-gray-200 mt-6">
                     <div className="flex items-center px-4">
                       <div className="flex-shrink-0">
                         <Avatar>
                           <AvatarImage src={user.avatar || ''} alt={user.username} />
-                          <AvatarFallback>{user.username?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
+                          <AvatarFallback className="bg-primary/10 text-primary">
+                            {user.username?.[0]?.toUpperCase() || 'U'}
+                          </AvatarFallback>
                         </Avatar>
                       </div>
                       <div className="ml-3">
                         <div className="text-base font-medium text-gray-800">{user.username}</div>
-                        <div className="text-sm font-medium text-gray-500">{user.email}</div>
+                        <div className="text-sm font-medium text-gray-500 truncate max-w-[180px]">{user.email}</div>
                       </div>
                     </div>
                     <div className="mt-3 space-y-1">
+                      <Link href="/profile" onClick={() => setIsMobileMenuOpen(false)}>
+                        <Button variant="ghost" className="w-full justify-start">
+                          <User className="mr-2 h-4 w-4" />
+                          My Profile
+                        </Button>
+                      </Link>
                       <Button 
                         variant="ghost" 
-                        className="w-full justify-start"
-                        onClick={async () => {
-                          await apiRequest('POST', '/api/auth/logout', {});
-                          window.location.href = '/';
+                        className="w-full justify-start text-red-600"
+                        onClick={() => {
+                          handleLogout();
                           setIsMobileMenuOpen(false);
                         }}
                       >
                         <LogOut className="mr-2 h-4 w-4" />
-                        Sign out
+                        Log out
                       </Button>
                     </div>
+                  </div>
+                ) : (
+                  <div className="pt-4 pb-3 border-t border-gray-200 mt-6 flex flex-col space-y-3">
+                    <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
+                      <Button variant="outline" className="w-full">Log in</Button>
+                    </Link>
+                    <Link href="/register" onClick={() => setIsMobileMenuOpen(false)}>
+                      <Button className="w-full">Sign up</Button>
+                    </Link>
                   </div>
                 )}
               </SheetContent>
@@ -169,7 +277,7 @@ const Navbar = () => {
           </div>
         </div>
       </div>
-    </nav>
+    </motion.nav>
   );
 };
 
