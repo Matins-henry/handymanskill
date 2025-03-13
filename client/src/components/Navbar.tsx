@@ -30,6 +30,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
+import { ThemeToggle } from "./ThemeToggle";
+
 // Define a basic user type locally to avoid import issues
 interface UserType {
   id: number;
@@ -96,7 +98,7 @@ const Navbar = () => {
       initial={{ y: -100, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.5, ease: "easeOut" }}
-      className={`bg-white sticky top-0 z-50 transition-all duration-300 ${
+      className={`bg-background sticky top-0 z-50 transition-all duration-300 ${
         scrolled ? "shadow-md" : "shadow-sm"
       }`}
     >
@@ -112,17 +114,17 @@ const Navbar = () => {
             
             <div className="hidden md:ml-8 md:flex md:space-x-8">
               <Link href="/" className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors duration-200 ${
-                isActive('/') ? 'border-primary text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                isActive('/') ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
               }`}>
                 Home
               </Link>
               <Link href="/job-matches" className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors duration-200 ${
-                isActive('/job-matches') ? 'border-primary text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                isActive('/job-matches') ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
               }`}>
                 Job Matches
               </Link>
               <Link href="/portfolio" className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors duration-200 ${
-                isActive('/portfolio') ? 'border-primary text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                isActive('/portfolio') ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
               }`}>
                 Portfolio
               </Link>
@@ -130,6 +132,8 @@ const Navbar = () => {
           </div>
           
           <div className="hidden md:ml-6 md:flex md:items-center space-x-3">
+            <ThemeToggle />
+            
             {user ? (
               <>
                 <Button variant="outline" size="sm" className="flex items-center gap-2">
@@ -138,7 +142,7 @@ const Navbar = () => {
                 </Button>
                 
                 <Button variant="ghost" size="icon" className="relative">
-                  <Bell className="h-5 w-5 text-gray-500" />
+                  <Bell className="h-5 w-5" />
                   <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0">2</Badge>
                   <span className="sr-only">Notifications</span>
                 </Button>
@@ -179,7 +183,7 @@ const Navbar = () => {
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600 focus:text-red-600">
+                    <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive focus:text-destructive">
                       <LogOut className="mr-2 h-4 w-4" />
                       <span>Log out</span>
                     </DropdownMenuItem>
@@ -217,24 +221,28 @@ const Navbar = () => {
                 
                 <div className="flex flex-col space-y-3 mt-6">
                   <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${
-                    isActive('/') ? 'bg-primary text-white' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    isActive('/') ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-accent hover:text-accent-foreground'
                   }`}>
                     Home
                   </Link>
                   <Link href="/job-matches" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${
-                    isActive('/job-matches') ? 'bg-primary text-white' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    isActive('/job-matches') ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-accent hover:text-accent-foreground'
                   }`}>
                     Job Matches
                   </Link>
                   <Link href="/portfolio" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${
-                    isActive('/portfolio') ? 'bg-primary text-white' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    isActive('/portfolio') ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-accent hover:text-accent-foreground'
                   }`}>
                     Portfolio
                   </Link>
                 </div>
                 
+                <div className="flex items-center justify-center mt-4">
+                  <ThemeToggle />
+                </div>
+                
                 {user ? (
-                  <div className="pt-4 pb-3 border-t border-gray-200 mt-6">
+                  <div className="pt-4 pb-3 border-t border-border mt-6">
                     <div className="flex items-center px-4">
                       <div className="flex-shrink-0">
                         <Avatar>
@@ -245,8 +253,8 @@ const Navbar = () => {
                         </Avatar>
                       </div>
                       <div className="ml-3">
-                        <div className="text-base font-medium text-gray-800">{user.username}</div>
-                        <div className="text-sm font-medium text-gray-500 truncate max-w-[180px]">{user.email}</div>
+                        <div className="text-base font-medium">{user.username}</div>
+                        <div className="text-sm font-medium text-muted-foreground truncate max-w-[180px]">{user.email}</div>
                       </div>
                     </div>
                     <div className="mt-3 space-y-1">
@@ -258,7 +266,7 @@ const Navbar = () => {
                       </Link>
                       <Button 
                         variant="ghost" 
-                        className="w-full justify-start text-red-600"
+                        className="w-full justify-start text-destructive"
                         onClick={() => {
                           handleLogout();
                           setIsMobileMenuOpen(false);
@@ -270,7 +278,7 @@ const Navbar = () => {
                     </div>
                   </div>
                 ) : (
-                  <div className="pt-4 pb-3 border-t border-gray-200 mt-6 flex flex-col space-y-3">
+                  <div className="pt-4 pb-3 border-t border-border mt-6 flex flex-col space-y-3">
                     <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
                       <Button variant="outline" className="w-full">Log in</Button>
                     </Link>
